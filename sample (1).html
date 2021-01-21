@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test xmpp</title>
+    <script
+            src="https://unpkg.com/@xmpp/client@0.11.1/dist/xmpp.min.js"
+            crossorigin
+    ></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+</head>
+<body>
+<script language="JavaScript">
+    const username = "second";
+    const password = '12345678';
+    const {client, xml, jid} = window.XMPP;
+    const xmpp = client({
+        service: 'wss://z.okey.com.ua:5443/ws',
+        username: username,
+        password: password,
+    });
+
+    function escapeHTML(html) {
+        return html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    const write_logs = function () {
+        for (let i = 0; i < arguments.length; i++) $('#logs').append('<p><code>' + escapeHTML(arguments[i]) + '</code></p>');
+    }
+    // function write_logs(message) {
+    //     $('#logs').append('<p>' + message + '</p>');
+    // }
+
+    function clear_logs() {
+        $('#logs').empty();
+    }
+
+    // debug(xmpp, true);
+
+    xmpp.start().catch(err => {
+        console.error('start failed', err);
+    });
+
+    xmpp.on("status", (status) => {
+        console.debug(status);
+    });
+
+    xmpp.on("online", (address) => {
+        write_logs("online" + address.toString());
+        xmpp.send(xml("presence"));
+    });
+
+    xmpp.on("stanza", (stanza) => {
+        if (stanza.is("presence")) return;
+        write_logs('Answer (stanza) : ' + stanza.toString());
+        if (!stanza.is("message")) return;
+    });
+
+    function discovering_support_mucsub() {
+        //    <iq from='hag66@shakespeare.example/pda'
+        //     to='muc.shakespeare.example'
+        //     type='get'
+        //     id='ik3vs715'>
+        //         <query xmlns='http://jabber.org/protocol/disco#info'/>
+        //         </iq>
+        const message = xml('iq', {'to': 'conference.z.okey.com.ua', 'type': 'get', 'id': '123321'},
+            xml('query', 'http://jabber.org/protocol/disco#info')
+        );
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+    function discovering_support_spec_muc() {
+        const dsomsm = $('#dsomsm').val();
+        const message = xml('iq', {
+                'from': username + '@z.okey.com.ua',
+                'to': 'abc@conference.z.okey.com.ua',
+                'type': 'get',
+                'id': '123321'
+            },
+            xml('query', 'http://jabber.org/protocol/disco#info')
+        );
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+    function get_list_of_subscribed_rooms() {
+        const message = xml('iq', {
+                'from': username + '@z.okey.com.ua',
+                'to': 'conference.z.okey.com.ua',
+                'type': 'get',
+                'id': 'unique_for_query'
+            },
+            xml('subscriptions', 'urn:xmpp:mucsub:0')
+        );
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+    /*
+    <iq from='hag66@shakespeare.example'
+    to='coven@muc.shakespeare.example'
+    type='set'
+    id='E6E10350-76CF-40C6-B91B-1EA08C332FC7'>
+  <subscribe xmlns='urn:xmpp:mucsub:0'
+             nick='mynick'
+             password='roompassword'>
+    <event node='urn:xmpp:mucsub:nodes:messages' />
+    <event node='urn:xmpp:mucsub:nodes:affiliations' />
+    <event node='urn:xmpp:mucsub:nodes:subject' />
+    <event node='urn:xmpp:mucsub:nodes:config' />
+  </subscribe>
+</iq>
+     */
+    function subscribe_user_to_room() {
+        const room_name = $('#subscribe_user_to_room_roomname').val();
+        const user_name = $('#subscribe_user_to_room_username').val();
+        const message = xml('iq', {
+                'from': user_name + '@z.okey.com.ua',
+                'to': room_name + '@conference.z.okey.com.ua',
+                'type': 'set',
+                'id': 'unique_id'
+            },
+            xml('subscribe', {'xmlns': 'urn:xmpp:mucsub:0', 'nick': user_name},
+                xml('event', {'node': 'urn:xmpp:mucsub:nodes:messages'}),
+                xml('event', {'node': 'urn:xmpp:mucsub:nodes:subject'})
+            )
+        );
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+    /*
+    <iq from='hag66@shakespeare.example'
+    to='coven@muc.shakespeare.example'
+    type='set'
+    id='E6E10350-76CF-40C6-B91B-1EA08C332FC7'>
+    <unsubscribe xmlns='urn:xmpp:mucsub:0' />
+    </iq>
+    */
+    function unsubscribe_user_from_room() {
+        const room_name = $('#unsubscribe_user_from_room_roomname').val();
+        const user_name = $('#unsubscribe_user_from_room_username').val();
+        const message = xml('iq', {
+                'from': user_name + '@z.okey.com.ua',
+                'to': room_name + '@conference.z.okey.com.ua',
+                'type': 'set',
+                'id': 'unique_id'
+            },
+            xml('unsubscribe', {'xmlns': 'urn:xmpp:mucsub:0'}),
+        );
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+
+    /*
+    <iq from='hag66@shakespeare.example'
+    to='coven@muc.shakespeare.example'
+    type='get'
+    id='E6E10350-76CF-40C6-B91B-1EA08C332FC7'>
+        <subscriptions xmlns='urn:xmpp:mucsub:0' />
+    </iq>
+     */
+    function getting_list_of_subscribers() {
+        const room_name = $('#getting_list_of_subscribers_in_the_room').val();
+        const message = xml('iq', {
+                'from': username + '@z.okey.com.ua',
+                'to': room_name + '@conference.z.okey.com.ua',
+                'type': 'get',
+                'id': 'unique_for_query'
+            },
+            xml('subscriptions', 'urn:xmpp:mucsub:0')
+        );
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+    // <iq from='crone1@shakespeare.lit/desktop'
+    // id='create1'
+    // to='coven@chat.shakespeare.lit'
+    // type='set'>
+    //     <query xmlns='http://jabber.org/protocol/muc#owner'>
+    //     <x xmlns='jabber:x:data' type='submit'/>
+    //     </query>
+    //     </iq>
+    function get_archive() {
+        let message = xml('iq', {'type': 'set', 'id': username},
+            xml('query', {'xmlns': 'urn:xmpp:mam:2', 'queryid': 'f27'})
+        );
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+    //<x xmlns='jabber:x:data' type='submit'>
+    // <field var='FORM_TYPE' type='hidden'>
+    //     <value>urn:xmpp:mam:2</value>
+    // </field>
+    // <field var='with'>
+    // <value>juliet@capulet.lit</value>
+    // </field>
+    // </x>
+
+    function get_archive_by_jid() {
+        let jid = $('#jid').val();
+        let message = xml('iq', {'type': 'set', 'id': username},
+            xml('query', {'xmlns': 'urn:xmpp:mam:2'},
+                xml('x', {'xmlns': 'jabber:x:data', 'type': 'submit'},
+                    xml('field', {'var': 'FORM_TYPE', 'type': 'hidden'},
+                        xml('value', {}, 'urn:xmpp:mam:2')
+                    ),
+                    xml('field', {'var': 'with'},
+                        xml('value', {}, jid)
+                    )
+                )
+            )
+        );
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+    function get_archive_by_room() {
+        let jid = $('#room_jid').val();
+        let message = xml('iq', {
+                'type': 'set', 'to': jid, 'id': username
+            },
+            xml('query', {'xmlns': 'urn:xmpp:mam:2'},
+                xml('set', {'xmlns': 'http://jabber.org/protocol/rsm'},
+                    xml('max', {}, 30),
+                    xml('before')
+                )
+            )
+            )
+        ;
+        write_logs('Query : ' + message);
+        xmpp.send(message);
+    }
+
+    function create_chat() {
+        let chat_name = $('#room_name').val();
+        let message = xml('presence', {
+                from: username + '@z.okey.com.ua',
+                to: chat_name + '@conference.z.okey.com.ua/' + username
+            },
+            xml('x', 'http://jabber.org/protocol/muc')
+        );
+        //write_logs(message.toString());
+        xmpp.send(message);
+        message = xml("iq", {
+                'to': chat_name + '@conference.z.okey.com.ua',
+                'from': username + '@z.okey.com.ua',
+                'id': 'create1',
+                'type': 'set'
+            },
+            xml('query', 'http://jabber.org/protocol/muc#owner',
+                xml('x', {'xmlns': 'jabber:x:data', 'type': 'submit'})
+            ),
+        );
+        write_logs(message.toString());
+        xmpp.send(message);
+    }
+
+    /*
+    <iq from='crone1@shakespeare.lit/desktop'
+        id='begone'
+        to='heath@chat.shakespeare.lit'
+        type='set'>
+      <query xmlns='http://jabber.org/protocol/muc#owner'>
+        <destroy jid='coven@chat.shakespeare.lit'>
+          <reason>Macbeth doth come.</reason>
+        </destroy>
+      </query>
+    </iq>
+     */
+    function destroy_chat() {
+        const chat_name = $('#room_name1').val();
+        const message = xml(
+            'iq', {
+                'id': 'destroy_room',
+                'to': chat_name + '@conference.z.okey.com.ua',
+                'from': username + '@z.okey.com.ua',
+                'type': 'set'
+            },
+            xml(
+                'query', 'http://jabber.org/protocol/muc#owner',
+                xml(
+                    'destroy', {},
+                    xml(
+                        'reason', {}, 'Because I want!'
+                    )
+                )
+            )
+        );
+        write_logs('<strong>Answer:</strong>' + message.toString());
+        xmpp.send(message);
+    }
+
+    function close_connection() {
+        xmpp.stop();
+    }
+
+
+</script>
+<div style="width:48%;float:left;padding:10px">
+    <form action="#" method="post">
+        <label for="room_name">Create room: </label><input type="text" maxlength="20" id="room_name">
+        <input type="button" title="Create room!" value="Create room!" onclick="create_chat();"><br/>
+        <label for="room_name1">Destroy room: </label><input type="text" maxlength="20" id="room_name1">
+        <input type="button" title="Create room!" value="Destroy room!" onclick="destroy_chat();">
+        <hr/>
+        <input type="button" title="Get Archive" value="Get Archive!" onclick="get_archive()">
+        <hr/>
+        <label for="jid">Get archive with: </label><input type="text" maxlength="50" name="jid" id="jid">
+        <input type="button" title="Get archive with" value="Get archive with" onclick="get_archive_by_jid();"><br/>
+        <label for="jid">Get archive with room: </label><input type="text" maxlength="50" name="room_jid" id="room_jid">
+        <input type="button" title="Get archive with room" value="Get archive with room"
+               onclick="get_archive_by_room();">
+        <hr/>
+        <input type="button" title="Close connection!" value="Close connection" onclick="close_connection();">
+        <hr/>
+        <label for="dsom">Discovering support on MUC service</label><input type="button" name="dsom" id="dsom"
+                                                                           value="Discover"
+                                                                           onclick="discovering_support_mucsub();"><br/>
+        <label for="dsomsm">Discovering support on a specific MUC</label><input type="text" name="dsomsm" id="dsomsm">
+        <input type="button" onclick="discovering_support_spec_muc();" value="Discover!">
+        <hr/>
+        <label for="get_list_of_subscribed_roms">Getting List of subscribed rooms: </label> <input type="button"
+                                                                                                   value="Discover"
+                                                                                                   id="get_list_of_subscribed_roms"
+                                                                                                   onclick="get_list_of_subscribed_rooms();"><br/>
+        <label for="getting_list_of_subscribers_in_the_room">Getting list of subscribers of a room</label><input
+            type="text" id="getting_list_of_subscribers_in_the_room"><input type="button" value="Discover"
+                                                                            onclick="getting_list_of_subscribers();">
+        <hr/>
+        <label for="subscribe_user_to_room_roomname">Subscribing to MUC/Sub events. Room name: </label><input
+            type="text" id="subscribe_user_to_room_roomname"><br/>
+        <label for="subscribe_user_to_room_username">User name: </label><input type="text"
+                                                                               id="subscribe_user_to_room_username">
+        <input type="button" value="Subscribe" onclick="subscribe_user_to_room();">
+        <hr/>
+        <label for="unsubscribe_user_from_room_roomname">Unsubscribing from a MUC Room. Room name: </label><input
+            type="text" id="unsubscribe_user_from_room_roomname"><br/>
+        <label for="unsubscribe_user_from_room_username">User name: </label><input type="text"
+                                                                                   id="unsubscribe_user_from_room_username">
+        <input type="button" value="Unsubscribe" onclick="unsubscribe_user_from_room();">
+        <hr/>
+    </form>
+</div>
+<div style="width:48%;float:left; border:1px grey" id="logs">
+
+</div>
+<div>
+    <input type="submit" value="Crear logs" onclick="clear_logs()">
+</div>
+</body>
+</html>

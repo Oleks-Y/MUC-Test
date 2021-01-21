@@ -1,0 +1,19 @@
+{
+  "name": "testing",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@xmpp/client": "^0.12.0",
+    "@xmpp/debug": "^0.12.0",
+    "@xmpp/sasl": "^0.12.0",
+    "axios": "^0.21.1",
+    "base-64": "^1.0.0",
+    "xmpp-client": "0.0.1"
+  }
+}
